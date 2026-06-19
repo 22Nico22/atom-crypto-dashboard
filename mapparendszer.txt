@@ -1,0 +1,202 @@
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║              ATOM CRYPTO DASHBOARD  —  MAPPARENDSZER / FILE STRUCTURE           ║
+║              Step-by-step local setup + GitHub deployment guide                  ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ DIRECTORY LAYOUT  (everything lives in one flat folder — simple and clean)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  atom-crypto-dashboard/          ← root project folder (any name you like)
+  │
+  ├── app.py                      ← MAIN APPLICATION  (the full dashboard code)
+  ├── requirements.txt            ← Python dependency list
+  ├── mapparendszer.txt           ← THIS file  (you are reading it)
+  │
+  ├── .gitignore                  ← (recommended) keeps junk out of GitHub
+  └── README.md                   ← (optional) GitHub project description
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ STEP-BY-STEP LOCAL SETUP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 1  —  Create your project folder
+──────────────────────────────────────
+  Windows (PowerShell / CMD):
+    mkdir atom-crypto-dashboard
+    cd    atom-crypto-dashboard
+
+  macOS / Linux (Terminal):
+    mkdir atom-crypto-dashboard && cd atom-crypto-dashboard
+
+
+STEP 2  —  Place the files in the folder
+─────────────────────────────────────────
+  Copy the following files into  atom-crypto-dashboard/ :
+
+    ✔  app.py              (the full Python / Streamlit source)
+    ✔  requirements.txt    (dependency list)
+    ✔  mapparendszer.txt   (this file — optional to commit)
+
+
+STEP 3  —  Create a Python virtual environment  (strongly recommended)
+───────────────────────────────────────────────────────────────────────
+  Windows:
+    python -m venv venv
+    venv\Scripts\activate
+
+  macOS / Linux:
+    python3 -m venv venv
+    source venv/bin/activate
+
+  Your prompt will change to:  (venv) ...
+
+
+STEP 4  —  Install all dependencies
+─────────────────────────────────────
+  (venv) pip install -r requirements.txt
+
+  Expected packages installed:
+    • streamlit      — web UI framework
+    • ccxt           — crypto exchange library (Binance public API)
+    • pandas         — data manipulation
+    • numpy          — numerical computing
+    • ta             — technical analysis indicators
+    • plotly         — interactive charting
+    • requests       — HTTP calls (Discord webhook)
+
+  Typical install time: 1–3 minutes on a normal internet connection.
+
+
+STEP 5  —  Run the dashboard locally
+──────────────────────────────────────
+  (venv) streamlit run app.py
+
+  Streamlit will print something like:
+
+    You can now view your Streamlit app in your browser.
+    Local URL:   http://localhost:8501
+    Network URL: http://192.168.x.x:8501
+
+  Open the Local URL in any browser — the dashboard loads instantly.
+
+
+STEP 6  —  Verify Discord alerts work
+──────────────────────────────────────
+  The webhook URL is already hardcoded in app.py.
+  When a HOLD → BUY or HOLD → SELL transition is detected:
+    • A Discord embed fires automatically (green for BUY, red for SELL).
+    • A toast notification appears inside the dashboard.
+  No extra configuration is needed.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ PUSHING TO GITHUB
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP A  —  Create a recommended  .gitignore  file
+───────────────────────────────────────────────────
+  Create a file called  .gitignore  in the project root with this content:
+
+    # Python
+    __pycache__/
+    *.py[cod]
+    *.pyo
+
+    # Virtual environment
+    venv/
+    .env/
+    env/
+
+    # Streamlit cache
+    .streamlit/
+
+    # OS junk
+    .DS_Store
+    Thumbs.db
+
+
+STEP B  —  Initialise Git and make first commit
+─────────────────────────────────────────────────
+  git init
+  git add app.py requirements.txt mapparendszer.txt .gitignore
+  git commit -m "feat: initial ATOM Crypto Dashboard"
+
+
+STEP C  —  Create a new GitHub repository
+───────────────────────────────────────────
+  1. Go to  https://github.com/new
+  2. Repository name:  atom-crypto-dashboard  (or any name)
+  3. Visibility:  Public or Private — your choice
+  4. Do NOT check "Add a README file" (you already have files locally)
+  5. Click  [Create repository]
+
+  GitHub will show you the remote URL, e.g.:
+    https://github.com/YOUR_USERNAME/atom-crypto-dashboard.git
+
+
+STEP D  —  Push to GitHub
+───────────────────────────
+  git remote add origin https://github.com/YOUR_USERNAME/atom-crypto-dashboard.git
+  git branch -M main
+  git push -u origin main
+
+  Refresh the GitHub page — your files should appear.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ OPTIONAL: FREE CLOUD DEPLOYMENT ON STREAMLIT COMMUNITY CLOUD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Streamlit Community Cloud hosts Streamlit apps 100 % free.
+
+  1. Go to  https://share.streamlit.io  and sign in with GitHub.
+  2. Click  [New app].
+  3. Select your repository and branch (main).
+  4. Set "Main file path" to:  app.py
+  5. Click  [Deploy!]
+
+  Your dashboard will be live at a public URL within ~2 minutes.
+  No server, no Docker, no DevOps — completely free.
+
+  ⚠  Note: Streamlit Community Cloud apps sleep after inactivity.
+     For always-on monitoring, run locally or use a VPS (e.g. a free
+     Oracle Cloud VM).
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ QUICK REFERENCE — DAILY USE COMMANDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  # Activate environment and launch dashboard
+  source venv/bin/activate          # (macOS/Linux)
+  venv\Scripts\activate             # (Windows)
+  streamlit run app.py
+
+  # Stop the dashboard
+  Press  Ctrl + C  in the terminal
+
+  # Update dependencies after changes to requirements.txt
+  pip install -r requirements.txt --upgrade
+
+  # Push code updates to GitHub
+  git add -A
+  git commit -m "update: <describe your change>"
+  git push
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ COST SUMMARY  —  EVERYTHING IS FREE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ✔  Binance data        — public REST API, no account or API key needed
+  ✔  All Python libs     — open source (MIT / BSD)
+  ✔  Streamlit           — open source framework, free to run locally
+  ✔  Discord webhook     — free with any Discord server
+  ✔  Streamlit Cloud     — free hosting tier (community plan)
+  ✔  GitHub              — free for public and private repositories
+
+  Total monthly cost:  $0.00
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

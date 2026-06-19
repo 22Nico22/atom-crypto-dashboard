@@ -1,0 +1,12 @@
+# ─────────────────────────────────────────────────────────────────
+#  ATOM Crypto Dashboard — requirements.txt
+#  Install with:  pip install -r requirements.txt
+# ─────────────────────────────────────────────────────────────────
+
+streamlit>=1.35.0
+ccxt>=4.3.0
+pandas>=2.0.0
+numpy>=1.26.0
+ta>=0.11.0
+plotly>=5.22.0
+requests>=2.31.0
