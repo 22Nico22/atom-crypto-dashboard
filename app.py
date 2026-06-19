@@ -156,11 +156,11 @@ def send_discord_alert(symbol: str, signal: str, price: float,
     is_buy  = signal == "BUY"
     color   = 0x00FF88 if is_buy else 0xFF4D6D
     emoji   = "🟢" if is_buy else "🔴"
-    action  = "BUY  📈" if is_buy else "SELL 📉"
+    action  = "BUY   📈" if is_buy else "SELL 📉"
     ts      = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
 
     embed = {
-        "title": f"{emoji}  ATOM SIGNAL  |  {symbol}  →  {action}",
+        "title": f"{emoji}   ATOM SIGNAL  |  {symbol}  →  {action}",
         "color": color,
         "description": (
             f"**Confluence strategy triggered a `{signal}` signal.**\n"
@@ -186,14 +186,15 @@ def send_discord_alert(symbol: str, signal: str, price: float,
         return False
 
 # ─────────────────────────────────────────────────────────────────
-#  DATA FETCHING
+#  DATA FETCHING (Binance REPLACED WITH Kraken)
 # ─────────────────────────────────────────────────────────────────
 @st.cache_resource
 def get_exchange():
-    return ccxt.binance({"enableRateLimit": True})
+    # Kraken is used here as it doesn't block regional requests like Binance
+    return ccxt.kraken({"enableRateLimit": True})
 
 def fetch_ohlcv(symbol: str, timeframe: str, limit: int = 200) -> pd.DataFrame:
-    """Fetch OHLCV from Binance public endpoint via ccxt."""
+    """Fetch OHLCV from Kraken public endpoint via ccxt."""
     cache_key = f"{symbol}_{timeframe}"
     now = time.time()
 
@@ -215,7 +216,7 @@ def fetch_ohlcv(symbol: str, timeframe: str, limit: int = 200) -> pd.DataFrame:
         st.session_state["last_fetch"][cache_key] = now
         return df
     except Exception as e:
-        st.error(f"Data fetch error for {symbol} ({timeframe}): {e}")
+        st.error(f"Data fetch error for {symbol} ({timeframe}) via Kraken: {e}")
         return pd.DataFrame()
 
 # ─────────────────────────────────────────────────────────────────
@@ -437,7 +438,7 @@ with st.sidebar:
     if port["positions"]:
         st.markdown("**Open Positions**")
         for sym, pos in port["positions"].items():
-            st.caption(f"{sym}  qty={pos['qty']:.6f}  @${pos['entry']:.4f}")
+            st.caption(f"{sym}   qty={pos['qty']:.6f}  @${pos['entry']:.4f}")
 
     st.markdown("---")
     if st.button("🗑️ Reset Portfolio", use_container_width=True):
@@ -450,7 +451,7 @@ with st.sidebar:
         st.rerun()
 
     st.markdown("---")
-    st.caption("📡 Data: Binance public API via ccxt")
+    st.caption("📡 Data: Kraken public API via ccxt")
     st.caption("🔔 Alerts: Discord Webhooks")
     st.caption("📊 Indicators: ta library")
 
@@ -460,7 +461,7 @@ with st.sidebar:
 if st.session_state["auto_refresh"]:
     time.sleep(0.1)   # yield before scheduling rerun
     st.markdown(
-        f"<p style='color:#6b7280;font-size:.72rem;'>"
+        f"<p style='color:#6b7280;font-size:.72rem;'> "
         f"⏱ Auto-refresh every {st.session_state['refresh_interval']}s — "
         f"next at {(datetime.datetime.now() + datetime.timedelta(seconds=st.session_state['refresh_interval'])).strftime('%H:%M:%S')}"
         f"</p>",
@@ -476,14 +477,14 @@ st.markdown(
     "<h1 style='font-family:monospace;color:#00ffe7;letter-spacing:.06em;margin-bottom:2px;'>"
     "⚡ ATOM CRYPTO DASHBOARD</h1>"
     "<p style='color:#6b7280;font-size:.8rem;margin-top:0;'>"
-    "Paper trading  •  Confluence strategy (BB + RSI + MACD)  •  100 % free  •  no API keys</p>",
+    "Paper trading  •  Confluence strategy (BB + RSI + MACD)  •  100 % free  •  no API keys (Kraken Network)</p>",
     unsafe_allow_html=True,
 )
 
 # ─────────────────────────────────────────────────────────────────
 #  FETCH + COMPUTE
 # ─────────────────────────────────────────────────────────────────
-with st.spinner(f"Fetching {selected_symbol} data from Binance…"):
+with st.spinner(f"Fetching {selected_symbol} data from Kraken…"):
     df_15 = fetch_ohlcv(selected_symbol, selected_tf)
     df_1h = fetch_ohlcv(selected_symbol, "1h")
 
@@ -709,9 +710,9 @@ if not df_1h.empty:
 # ─────────────────────────────────────────────────────────────────
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown(
-    "<p style='color:#6b7280;font-size:.7rem;text-align:center;letter-spacing:.06em;'>"
+    "<p style='color:#6b7280;font-size:.7rem;text-align:center;letter-spacing:.06em;'> "
     "⚡ ATOM Crypto Dashboard  •  For educational / paper trading purposes only  "
-    "•  Not financial advice  •  Data: Binance public API  •  No API keys required"
+    "•  Not financial advice  •  Data: Kraken public API  •  No API keys required"
     "</p>",
     unsafe_allow_html=True,
 )
