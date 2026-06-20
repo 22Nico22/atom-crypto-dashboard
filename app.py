@@ -127,7 +127,7 @@ div[data-testid="metric-container"] [data-testid="stMetricValue"] {
 # ─────────────────────────────────────────────────────────────────
 #  CONSTANTS
 # ─────────────────────────────────────────────────────────────────
-DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1517682020732375156/If-5BCf3TjD741en5MyTX4TvLu_QgMcug48f3aVgKeYzZBNHK6c2sJ5rCXf2g_0Ldp3M"
+DISCORD_WEBHOOK = st.secrets["DISCORD_WEBHOOK"]
 COINS = {
     "BTC/USDT": "₿ Bitcoin",
     "SOL/USDT": "◎ Solana",
