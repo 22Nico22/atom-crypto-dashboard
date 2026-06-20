@@ -108,11 +108,7 @@ section[data-testid="stSidebar"] {
 # ─────────────────────────────────────────────────────────────────
 #  CONSTANTS
 # ─────────────────────────────────────────────────────────────────
-DISCORD_WEBHOOK = (
-    "https://discord.com/api/webhooks/1517646161358360756/"
-    "lZFkwuWP1I13JNvOUsgxD5mBw2t-EMsh9X986X30Xh5F5OS07FUN6dwnEWM8kU7ZZmjs"
-)
-
+DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1517682020732375156/If-5BCf3TjD741en5MyTX4TvLu_QgMcug48f3aVgKeYzZBNHK6c2sJ5rCXf2g_0Ldp3M"
 COINS = {
     "BTC/USDT": "₿ Bitcoin",
     "SOL/USDT": "◎ Solana",
