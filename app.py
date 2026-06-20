@@ -23,7 +23,7 @@ st.set_page_config(
     page_title="⚡ ATOM Crypto Dashboard",
     page_icon="⚡",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="expanded",  # Alapból kényszeríti a nyitást
 )
 
 # ─────────────────────────────────────────────────────────────────
@@ -40,6 +40,15 @@ st.markdown("""
     --bg:    #0d0f14;
     --card:  #141720;
     --border:#1e2330;
+}
+
+/* KÉNYSZERÍTETT MENÜ NYITÁS ÉS BEZÁRÓ GOMB ELREJTÉSE */
+/* Eltünteti a bezáró 'X' gombot a menüből, így nem tudod véletlenül se lecsukni */
+button[data-testid="collapsedControl"] {
+    display: none !important;
+}
+section[data-testid="stSidebar"] button {
+    display: none !important;
 }
 
 /* full-page background */
@@ -174,7 +183,6 @@ def send_discord_alert(symbol: str, signal: str, price: float,
         "timestamp": datetime.datetime.utcnow().isoformat(),
     }
 
-    # Ide került be a tartalom, ami kiváltja a pinget a Discordon
     payload = {
         "content": f"@everyone 🚨 **ÚJ JELZÉS:** {symbol} → **{signal}**! 🚨",
         "embeds": [embed]
@@ -191,7 +199,6 @@ def send_discord_alert(symbol: str, signal: str, price: float,
 # ─────────────────────────────────────────────────────────────────
 @st.cache_resource
 def get_exchange():
-    # Kraken is used here as it doesn't block regional requests like Binance
     return ccxt.kraken({"enableRateLimit": True})
 
 def fetch_ohlcv(symbol: str, timeframe: str, limit: int = 200) -> pd.DataFrame:
@@ -199,7 +206,6 @@ def fetch_ohlcv(symbol: str, timeframe: str, limit: int = 200) -> pd.DataFrame:
     cache_key = f"{symbol}_{timeframe}"
     now = time.time()
 
-    # Return cached data if fresher than 45 s
     if (
         cache_key in st.session_state["cache"]
         and cache_key in st.session_state["last_fetch"]
@@ -229,16 +235,13 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
     close = df["close"]
 
-    # RSI 14
     df["rsi"] = ta.momentum.RSIIndicator(close=close, window=14).rsi()
 
-    # MACD 12-26-9
     macd_obj = ta.trend.MACD(close=close, window_slow=26, window_fast=12, window_sign=9)
     df["macd"]      = macd_obj.macd()
     df["macd_sig"]  = macd_obj.macd_signal()
     df["macd_hist"] = macd_obj.macd_diff()
 
-    # Bollinger Bands 20-2
     bb_obj = ta.volatility.BollingerBands(close=close, window=20, window_dev=2)
     df["bb_upper"]  = bb_obj.bollinger_hband()
     df["bb_mid"]    = bb_obj.bollinger_mavg()
@@ -266,7 +269,6 @@ def generate_signal(df: pd.DataFrame) -> dict:
     bb_lower  = row["bb_lower"]
     bb_upper  = row["bb_upper"]
 
-    # Previous bar histogram (for direction check)
     prev_rows = df.dropna(subset=["macd_hist"])
     if len(prev_rows) >= 2:
         prev_hist = prev_rows.iloc[-2]["macd_hist"]
@@ -291,7 +293,7 @@ def execute_paper_trade(symbol: str, signal: str, price: float):
     port = st.session_state["portfolio"]
 
     if signal == "BUY" and symbol not in port["positions"] and port["cash"] > 10:
-        qty   = (port["cash"] * 0.95) / price   # use 95 % of cash
+        qty   = (port["cash"] * 0.95) / price 
         cost  = qty * price
         port["cash"] -= cost
         port["positions"][symbol] = {"qty": qty, "entry": price}
@@ -323,7 +325,7 @@ def portfolio_value(live_prices: dict) -> float:
     return total
 
 # ─────────────────────────────────────────────────────────────────
-#  CHART
+#  CHART KEYS
 # ─────────────────────────────────────────────────────────────────
 CHART_BG   = "#0d0f14"
 CHART_GRID = "#1e2330"
@@ -341,7 +343,6 @@ def build_chart(df: pd.DataFrame, symbol: str) -> go.Figure:
         subplot_titles=[f"{symbol}  —  Price & Bollinger Bands", "RSI (14)"],
     )
 
-    # ── Candlesticks ──
     fig.add_trace(go.Candlestick(
         x=df.index, open=df["open"], high=df["high"],
         low=df["low"], close=df["close"],
@@ -350,7 +351,6 @@ def build_chart(df: pd.DataFrame, symbol: str) -> go.Figure:
         name="Price",
     ), row=1, col=1)
 
-    # ── Bollinger Bands ──
     fig.add_trace(go.Scatter(
         x=df.index, y=df["bb_upper"],
         line=dict(color="rgba(0,255,231,0.45)", width=1.2, dash="dot"),
@@ -369,7 +369,6 @@ def build_chart(df: pd.DataFrame, symbol: str) -> go.Figure:
         name="BB Lower",
     ), row=1, col=1)
 
-    # ── RSI ──
     fig.add_trace(go.Scatter(
         x=df.index, y=df["rsi"],
         line=dict(color=NEON, width=1.6),
@@ -379,7 +378,6 @@ def build_chart(df: pd.DataFrame, symbol: str) -> go.Figure:
     fig.add_hline(y=35,  line=dict(color=GREEN_C, width=1, dash="dash"), row=2, col=1)
     fig.add_hline(y=50,  line=dict(color=CHART_GRID, width=1), row=2, col=1)
 
-    # ── Layout ──
     fig.update_layout(
         paper_bgcolor=CHART_BG,
         plot_bgcolor=CHART_BG,
@@ -429,7 +427,7 @@ with st.sidebar:
     st.session_state["auto_refresh"] = auto_ref
     if auto_ref:
         interval = st.slider("Interval (seconds)", 30, 300,
-                              st.session_state["refresh_interval"], step=15)
+                             st.session_state["refresh_interval"], step=15)
         st.session_state["refresh_interval"] = interval
 
     st.markdown("---")
@@ -460,7 +458,7 @@ with st.sidebar:
 #  AUTO-REFRESH TRIGGER
 # ─────────────────────────────────────────────────────────────────
 if st.session_state["auto_refresh"]:
-    time.sleep(0.1)   # yield before scheduling rerun
+    time.sleep(0.1)   
     st.markdown(
         f"<p style='color:#6b7280;font-size:.72rem;'> "
         f"⏱ Auto-refresh every {st.session_state['refresh_interval']}s — "
@@ -468,7 +466,6 @@ if st.session_state["auto_refresh"]:
         f"</p>",
         unsafe_allow_html=True,
     )
-    # Streamlit's rerun scheduling:
     st.session_state["_refresh_counter"] = st.session_state.get("_refresh_counter", 0) + 1
 
 # ─────────────────────────────────────────────────────────────────
@@ -499,7 +496,6 @@ macd_h   = sig_data["macd_hist"]
 bb_lo    = sig_data["bb_lower"]
 bb_hi    = sig_data["bb_upper"]
 
-# ── Discord alert on HOLD → BUY/SELL transition ──────────────────
 prev_signal = st.session_state["last_signals"].get(selected_symbol, "HOLD")
 if prev_signal == "HOLD" and signal in ("BUY", "SELL"):
     sent = send_discord_alert(
@@ -515,11 +511,9 @@ if prev_signal == "HOLD" and signal in ("BUY", "SELL"):
 
 st.session_state["last_signals"][selected_symbol] = signal
 
-# ── Execute paper trade ──────────────────────────────────────────
 if price:
     execute_paper_trade(selected_symbol, signal, price)
 
-# ── Live prices for all symbols (for portfolio value) ────────────
 live_prices: dict = {}
 for sym in COINS:
     cached = st.session_state["cache"].get(f"{sym}_{selected_tf}")
@@ -585,7 +579,7 @@ else:
     st.warning("No chart data available — retrying next refresh.")
 
 # ─────────────────────────────────────────────────────────────────
-#  SIGNAL DETAIL + INDICATOR SNAPSHOT
+#  SIGNAL DETAIL
 # ─────────────────────────────────────────────────────────────────
 st.markdown("<div class='section-title'>🔬 Signal & Indicator Snapshot</div>",
             unsafe_allow_html=True)
@@ -618,13 +612,9 @@ with col_c:
             unsafe_allow_html=True,
         )
 
-# ── Strategy condition status ─────────────────────────────────────
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("<div class='section-title'>✅ Confluence Conditions</div>",
             unsafe_allow_html=True)
-
-def tick(cond):
-    return "✅" if cond else "⬜"
 
 if price and rsi_val and bb_lo and bb_hi and macd_h is not None:
     prev_hist = df_main["macd_hist"].dropna().iloc[-2] if len(df_main.dropna(subset=["macd_hist"])) >= 2 else macd_h
@@ -637,12 +627,12 @@ if price and rsi_val and bb_lo and bb_hi and macd_h is not None:
 
     cols = st.columns(6)
     labels = [
-        (f"{tick(b1)} Price ≤ BB Lower",  b1),
-        (f"{tick(b2)} RSI < 35",           b2),
-        (f"{tick(b3)} MACD Hist ↑",        b3),
-        (f"{tick(s1)} Price ≥ BB Upper",   s1),
-        (f"{tick(s2)} RSI > 65",           s2),
-        (f"{tick(s3)} MACD Hist ↓",        s3),
+        (f"{'✅' if b1 else '⬜'} Price ≤ BB Lower",  b1),
+        (f"{'✅' if b2 else '⬜'} RSI < 35",           b2),
+        (f"{'✅' if b3 else '⬜'} MACD Hist ↑",        b3),
+        (f"{'✅' if s1 else '⬜'} Price ≥ BB Upper",   s1),
+        (f"{'✅' if s2 else '⬜'} RSI > 65",           s2),
+        (f"{'✅' if s3 else '⬜'} MACD Hist ↓",        s3),
     ]
     for col, (label, _) in zip(cols, labels):
         col.markdown(
@@ -661,7 +651,7 @@ log = st.session_state["trade_log"]
 if not log:
     st.caption("No trades executed yet — waiting for confluence signals.")
 else:
-    rows = list(reversed(log[-50:]))   # newest first, cap at 50
+    rows = list(reversed(log[-50:]))
     html = """<table class='trade-table'>
 <thead><tr>
   <th>Time</th><th>Symbol</th><th>Action</th>
@@ -685,7 +675,7 @@ else:
     st.markdown(html, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────────
-#  1H OHLCV SNAPSHOT TABLE
+#  1H OHLCV
 # ─────────────────────────────────────────────────────────────────
 st.markdown("<br><div class='section-title'>📊 1H Recent OHLCV — {}</div>".format(selected_symbol),
             unsafe_allow_html=True)
@@ -718,9 +708,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ─────────────────────────────────────────────────────────────────
-#  SCHEDULE NEXT AUTO-REFRESH
-# ─────────────────────────────────────────────────────────────────
 if st.session_state["auto_refresh"]:
     time.sleep(st.session_state["refresh_interval"])
     st.rerun()
