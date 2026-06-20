@@ -142,8 +142,8 @@ def init_state():
         "last_signals": {},    # symbol -> last signal string
         "last_fetch": {},      # symbol+tf -> timestamp
         "cache": {},           # symbol+tf -> DataFrame
-        "auto_refresh": False,
-        "refresh_interval": 60,
+        "auto_refresh": True,        # <-- Ezt állítottam True-ra
+        "refresh_interval": 30,      # <-- Ezt állítottam 30-ra
     }
     for k, v in defaults.items():
         if k not in st.session_state:
