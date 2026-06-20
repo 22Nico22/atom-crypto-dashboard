@@ -23,7 +23,7 @@ st.set_page_config(
     page_title="⚡ ATOM Crypto Dashboard",
     page_icon="⚡",
     layout="wide",
-    initial_sidebar_state="expanded",  # Alapból kényszeríti a nyitást
+    initial_sidebar_state="expanded",
 )
 
 # ─────────────────────────────────────────────────────────────────
@@ -42,13 +42,27 @@ st.markdown("""
     --border:#1e2330;
 }
 
-/* KÉNYSZERÍTETT MENÜ NYITÁS ÉS BEZÁRÓ GOMB ELREJTÉSE */
-/* Eltünteti a bezáró 'X' gombot a menüből, így nem tudod véletlenül se lecsukni */
-button[data-testid="collapsedControl"] {
-    display: none !important;
+/* FIX NYITÓ GOMB STÍLUSA A BAL FELSŐ SAROKBA */
+#custom-sidebar-open-btn {
+    position: fixed;
+    top: 60px;
+    left: 10px;
+    z-index: 999999;
+    background-color: var(--card);
+    color: var(--neon);
+    border: 1px solid var(--neon);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-family: monospace;
+    font-size: 0.85rem;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(0,255,231,0.3);
+    transition: all 0.2s ease;
 }
-section[data-testid="stSidebar"] button {
-    display: none !important;
+#custom-sidebar-open-btn:hover {
+    background-color: var(--neon);
+    color: var(--bg);
+    box-shadow: 0 0 15px rgba(0,255,231,0.6);
 }
 
 /* full-page background */
@@ -112,6 +126,21 @@ section[data-testid="stSidebar"] {
                   border-bottom:1px solid var(--border); }
 .trade-table tr:last-child td { border-bottom: none; }
 </style>
+
+<!-- EZ A JAVASCRIPT GOMB KÉNYSZERÍTI KI A NYITÁST -->
+<button id="custom-sidebar-open-btn" onclick="openSidebar()">▶ MENÜ NYITÁSA</button>
+
+<script>
+function openSidebar() {
+    const streamlitArrow = parent.document.querySelector('button[data-testid="collapsedControl"]');
+    if (streamlitArrow) {
+        streamlitArrow.click();
+    } else {
+        const event = new KeyboardEvent('keydown', { key: 'x', keyCode: 88, bubbles: true });
+        parent.document.dispatchEvent(event);
+    }
+}
+</script>
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────────
