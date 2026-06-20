@@ -1,7 +1,7 @@
 """
 ╔══════════════════════════════════════════════════════════════════╗
-║          ATOM CRYPTO TRADING DASHBOARD  v1.0                     ║
-║          100% Free  •  No API Keys  •  Discord Alerts            ║
+║          ATOM CRYPTO TRADING DASHBOARD  v1.1                     ║
+║          100% Free  •  No API Keys  •  Semi-Auto Execution       ║
 ╚══════════════════════════════════════════════════════════════════╝
 """
 
@@ -23,7 +23,7 @@ st.set_page_config(
     page_title="⚡ ATOM Crypto Dashboard",
     page_icon="⚡",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",  # Fixen elrejtjük a gyári oldalsávot
 )
 
 # ─────────────────────────────────────────────────────────────────
@@ -42,34 +42,36 @@ st.markdown("""
     --border:#1e2330;
 }
 
-/* FIX NYITÓ GOMB STÍLUSA A BAL FELSŐ SAROKBA */
-#custom-sidebar-open-btn {
-    position: fixed;
-    top: 60px;
-    left: 10px;
-    z-index: 999999;
-    background-color: var(--card);
-    color: var(--neon);
-    border: 1px solid var(--neon);
-    border-radius: 8px;
-    padding: 8px 14px;
-    font-family: monospace;
-    font-size: 0.85rem;
-    cursor: pointer;
-    box-shadow: 0 0 10px rgba(0,255,231,0.3);
-    transition: all 0.2s ease;
-}
-#custom-sidebar-open-btn:hover {
-    background-color: var(--neon);
-    color: var(--bg);
-    box-shadow: 0 0 15px rgba(0,255,231,0.6);
-}
-
 /* full-page background */
 .stApp { background-color: var(--bg); }
 
-/* hide hamburger / footer */
-#MainMenu, footer, header { visibility: hidden; }
+/* hide hamburger / footer / default sidebar toggle */
+#MainMenu, footer, header, [data-testid="collapsedControl"] { visibility: hidden !important; }
+
+/* FIX VEZÉRLŐPULT DOBOZOK FORMÁZÁSA */
+div[data-testid="stSelectbox"], div[data-testid="stSlider"], div[data-testid="stElementContainer"] .stToggle {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    box-shadow: 0 0 10px rgba(0,255,231,0.02);
+}
+div[data-testid="stSelectbox"] label, div[data-testid="stSlider"] label, div[data-testid="stElementContainer"] .stToggle label {
+    color: #6b7280 !important;
+    font-size: 0.75rem !important;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* JÓVÁHAGYÁSI PANEL STÍLUSA */
+.action-panel {
+    background: linear-gradient(135deg, #141720 0%, #1a1f2c 100%);
+    border: 2px solid var(--neon);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 0 20px rgba(0,255,231,0.15);
+}
 
 /* metric cards */
 div[data-testid="metric-container"] {
@@ -89,12 +91,6 @@ div[data-testid="metric-container"] [data-testid="stMetricValue"] {
     color: var(--neon) !important;
     font-size: 1.9rem !important;
     font-weight: 700 !important;
-}
-
-/* sidebar */
-section[data-testid="stSidebar"] {
-    background: var(--card) !important;
-    border-right: 1px solid var(--border);
 }
 
 /* plotly chart container */
@@ -126,21 +122,6 @@ section[data-testid="stSidebar"] {
                   border-bottom:1px solid var(--border); }
 .trade-table tr:last-child td { border-bottom: none; }
 </style>
-
-<!-- EZ A JAVASCRIPT GOMB KÉNYSZERÍTI KI A NYITÁST -->
-<button id="custom-sidebar-open-btn" onclick="openSidebar()">▶ MENÜ NYITÁSA</button>
-
-<script>
-function openSidebar() {
-    const streamlitArrow = parent.document.querySelector('button[data-testid="collapsedControl"]');
-    if (streamlitArrow) {
-        streamlitArrow.click();
-    } else {
-        const event = new KeyboardEvent('keydown', { key: 'x', keyCode: 88, bubbles: true });
-        parent.document.dispatchEvent(event);
-    }
-}
-</script>
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────────
@@ -171,8 +152,9 @@ def init_state():
         "last_signals": {},    # symbol -> last signal string
         "last_fetch": {},      # symbol+tf -> timestamp
         "cache": {},           # symbol+tf -> DataFrame
-        "auto_refresh": True,        # <-- Ezt állítottam True-ra
-        "refresh_interval": 30,      # <-- Ezt állítottam 30-ra
+        "auto_refresh": True,
+        "refresh_interval": 30,
+        "pending_trade": None, # <-- Itt tároljuk a jóváhagyásra váró tradet
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -186,7 +168,6 @@ init_state()
 def send_discord_alert(symbol: str, signal: str, price: float,
                        rsi: float, macd_hist: float,
                        bb_lower: float, bb_upper: float) -> bool:
-    """Fire a rich embed to Discord with an @everyone ping. Returns True on success."""
     is_buy  = signal == "BUY"
     color   = 0x00FF88 if is_buy else 0xFF4D6D
     emoji   = "🟢" if is_buy else "🔴"
@@ -198,7 +179,7 @@ def send_discord_alert(symbol: str, signal: str, price: float,
         "color": color,
         "description": (
             f"**Confluence strategy triggered a `{signal}` signal.**\n"
-            f"All three conditions met simultaneously."
+            f"A rögzítéshez nyisd meg a Dashboard felületét!"
         ),
         "fields": [
             {"name": "💰 Live Price",     "value": f"`${price:,.4f}`",       "inline": True},
@@ -208,12 +189,12 @@ def send_discord_alert(symbol: str, signal: str, price: float,
             {"name": "🔺 BB Upper",       "value": f"`${bb_upper:,.4f}`",    "inline": True},
             {"name": "🕐 Time (UTC)",     "value": f"`{ts}`",                "inline": False},
         ],
-        "footer": {"text": "ATOM Crypto Dashboard  •  Simulated paper trading only"},
+        "footer": {"text": "ATOM Crypto Dashboard  •  Semi-Auto verification system"},
         "timestamp": datetime.datetime.utcnow().isoformat(),
     }
 
     payload = {
-        "content": f"@everyone 🚨 **ÚJ JELZÉS:** {symbol} → **{signal}**! 🚨",
+        "content": f"@everyone 🚨 **MANUÁLIS JÓVÁHAGYÁSRA VÁRÓ JELZÉS:** {symbol} → **{signal}**! 🚨",
         "embeds": [embed]
     }
     
@@ -224,14 +205,13 @@ def send_discord_alert(symbol: str, signal: str, price: float,
         return False
     
 # ─────────────────────────────────────────────────────────────────
-#  DATA FETCHING (Binance REPLACED WITH Kraken)
+#  DATA FETCHING (Kraken public public API)
 # ─────────────────────────────────────────────────────────────────
 @st.cache_resource
 def get_exchange():
     return ccxt.kraken({"enableRateLimit": True})
 
 def fetch_ohlcv(symbol: str, timeframe: str, limit: int = 200) -> pd.DataFrame:
-    """Fetch OHLCV from Kraken public endpoint via ccxt."""
     cache_key = f"{symbol}_{timeframe}"
     now = time.time()
 
@@ -263,7 +243,6 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
         return df
 
     close = df["close"]
-
     df["rsi"] = ta.momentum.RSIIndicator(close=close, window=14).rsi()
 
     macd_obj = ta.trend.MACD(close=close, window_slow=26, window_fast=12, window_sign=9)
@@ -282,7 +261,6 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
 #  SIGNAL ENGINE
 # ─────────────────────────────────────────────────────────────────
 def generate_signal(df: pd.DataFrame) -> dict:
-    """Return the latest signal dict."""
     null_result = {
         "signal": "HOLD", "price": None,
         "rsi": None, "macd_hist": None,
@@ -316,9 +294,9 @@ def generate_signal(df: pd.DataFrame) -> dict:
     }
 
 # ─────────────────────────────────────────────────────────────────
-#  PAPER TRADING ENGINE
+#  MANUAL PAPER TRADING ENGINE (EXEcutes only on button click)
 # ─────────────────────────────────────────────────────────────────
-def execute_paper_trade(symbol: str, signal: str, price: float):
+def execute_approved_trade(symbol: str, signal: str, price: float):
     port = st.session_state["portfolio"]
 
     if signal == "BUY" and symbol not in port["positions"] and port["cash"] > 10:
@@ -331,6 +309,7 @@ def execute_paper_trade(symbol: str, signal: str, price: float):
             "symbol": symbol, "action": "BUY",
             "price": price, "qty": qty, "pnl": None,
         })
+        st.toast(f"✅ Pozíció sikeresen rögzítve: BUY {symbol}", icon="📈")
 
     elif signal == "SELL" and symbol in port["positions"]:
         pos    = port["positions"].pop(symbol)
@@ -344,6 +323,7 @@ def execute_paper_trade(symbol: str, signal: str, price: float):
             "symbol": symbol, "action": "SELL",
             "price": price, "qty": qty, "pnl": pnl,
         })
+        st.toast(f"🛑 Pozíció sikeresen lezárva: SELL {symbol}", icon="📉")
 
 def portfolio_value(live_prices: dict) -> float:
     port  = st.session_state["portfolio"]
@@ -354,7 +334,7 @@ def portfolio_value(live_prices: dict) -> float:
     return total
 
 # ─────────────────────────────────────────────────────────────────
-#  CHART KEYS
+#  CHART BUILDER
 # ─────────────────────────────────────────────────────────────────
 CHART_BG   = "#0d0f14"
 CHART_GRID = "#1e2330"
@@ -433,80 +413,78 @@ def build_chart(df: pd.DataFrame, symbol: str) -> go.Figure:
     return fig
 
 # ─────────────────────────────────────────────────────────────────
-#  SIDEBAR
+#  MAIN — HEADER & APP TITLE
 # ─────────────────────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("## ⚡ ATOM Dashboard")
-    st.markdown("---")
+st.markdown(
+    "<h1 style='font-family:monospace;color:#00ffe7;letter-spacing:.06em;margin-bottom:2px;'>"
+    "⚡ ATOM CRYPTO DASHBOARD</h1>"
+    "<p style='color:#6b7280;font-size:.8rem;margin-top:0;'>"
+    "Semi-Automated Paper trading  •  Confluence strategy  •  100 % free  •  no API keys (Kraken Network)</p>",
+    unsafe_allow_html=True,
+)
 
+# ─────────────────────────────────────────────────────────────────
+#  VÍZSZINTES VEZÉRLŐPULT (A FŐOLDAL TETEJÉN)
+# ─────────────────────────────────────────────────────────────────
+st.markdown("<div class='section-title'>⚙️ Rendszer Beállítások & Vezérlés</div>", unsafe_allow_html=True)
+
+p_col1, p_col2, p_col3, p_col4 = st.columns([1.5, 1.5, 2, 1.2])
+
+with p_col1:
     selected_symbol = st.selectbox(
-        "Select Asset",
+        "Asset",
         list(COINS.keys()),
         format_func=lambda s: COINS[s],
     )
+
+with p_col2:
     selected_tf = st.selectbox(
         "Timeframe",
         list(TIMEFRAMES.keys()),
         format_func=lambda t: TIMEFRAMES[t],
     )
 
-    st.markdown("---")
-    st.markdown("### 🔄 Auto Refresh")
+with p_col3:
     auto_ref = st.toggle("Enable Auto Refresh", value=st.session_state["auto_refresh"])
     st.session_state["auto_refresh"] = auto_ref
+    
     if auto_ref:
         interval = st.slider("Interval (seconds)", 30, 300,
                              st.session_state["refresh_interval"], step=15)
         st.session_state["refresh_interval"] = interval
+    else:
+        interval = st.session_state["refresh_interval"]
 
-    st.markdown("---")
-    st.markdown("### 💼 Portfolio")
-    port = st.session_state["portfolio"]
-    st.metric("Cash Balance", f"${port['cash']:,.2f}")
-    if port["positions"]:
-        st.markdown("**Open Positions**")
-        for sym, pos in port["positions"].items():
-            st.caption(f"{sym}   qty={pos['qty']:.6f}  @${pos['entry']:.4f}")
-
-    st.markdown("---")
+with p_col4:
+    st.markdown("<p style='margin-bottom: 28px;'></p>", unsafe_allow_html=True) 
     if st.button("🗑️ Reset Portfolio", use_container_width=True):
-        st.session_state["portfolio"] = {
-            "cash": STARTING_BALANCE,
-            "positions": {},
-        }
+        st.session_state["portfolio"] = {"cash": STARTING_BALANCE, "positions": {}}
         st.session_state["trade_log"] = []
         st.session_state["last_signals"] = {}
+        st.session_state["pending_trade"] = None
         st.rerun()
 
-    st.markdown("---")
-    st.caption("📡 Data: Kraken public API via ccxt")
-    st.caption("🔔 Alerts: Discord Webhooks")
-    st.caption("📊 Indicators: ta library")
+# Nyitott pozíciók kijelzése
+port = st.session_state["portfolio"]
+if port["positions"]:
+    pos_details = " • ".join([f"<b>{sym}</b>: {pos['qty']:.4f} @ ${pos['entry']:.2f}" for sym, pos in port["positions"].items()])
+    st.markdown(f"<p style='font-size:0.8rem; color:#6b7280; background:#141720; padding: 6px 12px; border-radius:6px; border: 1px solid #1e2330;'>💼 <b>Nyitott pozíciók:</b> {pos_details}</p>", unsafe_allow_html=True)
+
+st.markdown("---")
 
 # ─────────────────────────────────────────────────────────────────
-#  AUTO-REFRESH TRIGGER
+#  AUTO-REFRESH TRIGGER TIMING INFO
 # ─────────────────────────────────────────────────────────────────
 if st.session_state["auto_refresh"]:
     time.sleep(0.1)   
     st.markdown(
-        f"<p style='color:#6b7280;font-size:.72rem;'> "
+        f"<p style='color:#6b7280;font-size:.72rem;margin-top:-15px;margin-bottom:15px;'> "
         f"⏱ Auto-refresh every {st.session_state['refresh_interval']}s — "
         f"next at {(datetime.datetime.now() + datetime.timedelta(seconds=st.session_state['refresh_interval'])).strftime('%H:%M:%S')}"
         f"</p>",
         unsafe_allow_html=True,
     )
     st.session_state["_refresh_counter"] = st.session_state.get("_refresh_counter", 0) + 1
-
-# ─────────────────────────────────────────────────────────────────
-#  MAIN  — HEADER
-# ─────────────────────────────────────────────────────────────────
-st.markdown(
-    "<h1 style='font-family:monospace;color:#00ffe7;letter-spacing:.06em;margin-bottom:2px;'>"
-    "⚡ ATOM CRYPTO DASHBOARD</h1>"
-    "<p style='color:#6b7280;font-size:.8rem;margin-top:0;'>"
-    "Paper trading  •  Confluence strategy (BB + RSI + MACD)  •  100 % free  •  no API keys (Kraken Network)</p>",
-    unsafe_allow_html=True,
-)
 
 # ─────────────────────────────────────────────────────────────────
 #  FETCH + COMPUTE
@@ -525,24 +503,65 @@ macd_h   = sig_data["macd_hist"]
 bb_lo    = sig_data["bb_lower"]
 bb_hi    = sig_data["bb_upper"]
 
+# DISCORD RIASZTÁS INDÍTÁSA + PENDING STATE MENTÉSE
 prev_signal = st.session_state["last_signals"].get(selected_symbol, "HOLD")
 if prev_signal == "HOLD" and signal in ("BUY", "SELL"):
-    sent = send_discord_alert(
-        symbol=selected_symbol, signal=signal,
-        price=price, rsi=rsi_val or 0,
-        macd_hist=macd_h or 0,
-        bb_lower=bb_lo or 0, bb_upper=bb_hi or 0,
-    )
-    if sent:
-        st.toast(f"📲 Discord alert sent: {signal} on {selected_symbol}", icon="✅")
-    else:
-        st.toast("⚠️ Discord webhook failed — check URL", icon="⚠️")
+    # Csak akkor hozunk létre pending tradet, ha a portfólió állapota megengedi
+    is_valid_buy = (signal == "BUY" and selected_symbol not in port["positions"])
+    is_valid_sell = (signal == "SELL" and selected_symbol in port["positions"])
+    
+    if is_valid_buy or is_valid_sell:
+        st.session_state["pending_trade"] = {
+            "symbol": selected_symbol,
+            "action": signal,
+            "price": price
+        }
+        sent = send_discord_alert(
+            symbol=selected_symbol, signal=signal,
+            price=price, rsi=rsi_val or 0,
+            macd_hist=macd_h or 0,
+            bb_lower=bb_lo or 0, bb_upper=bb_hi or 0,
+        )
+        if sent:
+            st.toast(f"📲 Discord alert sent: {signal} on {selected_symbol}", icon="✅")
+        else:
+            st.toast("⚠️ Discord webhook failed — check URL", icon="⚠️")
 
 st.session_state["last_signals"][selected_symbol] = signal
 
-if price:
-    execute_paper_trade(selected_symbol, signal, price)
+# ─────────────────────────────────────────────────────────────────
+#  INTERAKTÍV JÓVÁHAGYÁSI PANEL (Csak ha van függőben lévő trade)
+# ─────────────────────────────────────────────────────────────────
+if st.session_state["pending_trade"] is not None:
+    pt = st.session_state["pending_trade"]
+    
+    # Ha időközben elváltott a coinról, akkor is emlékeztetjük a legfelső panelen
+    st.markdown(
+        f"""
+        <div class="action-panel">
+            <h3 style="margin-top:0; color:var(--neon); font-family:monospace;">🚨 AKCIÓ MEGERŐSÍTÉSE SZÜKSÉGES</h3>
+            <p style="color:#c9d1d9; font-size:0.92rem;">
+                A stratégia <b>{pt['action']}</b> jelzést adott a(z) <span style="color:var(--neon); font-weight:bold;">{pt['symbol']}</span> páron 
+                <b>${pt['price']:,.4f}</b> áron. Végrehajtottad a cserét az éles számládon?
+            </p>
+        </div>
+        """, 
+        unsafe_allow_html=True
+    )
+    
+    btn_col1, btn_col2, _ = st.columns([2, 2, 4])
+    with btn_col1:
+        if st.button(f"✅ IGEN, rögzítsük a logba", use_container_width=True):
+            execute_approved_trade(pt["symbol"], pt["action"], pt["price"])
+            st.session_state["pending_trade"] = None
+            st.rerun()
+            
+    with btn_col2:
+        if st.button("❌ NEM, hagyjuk ki ezt a tradet", use_container_width=True):
+            st.session_state["pending_trade"] = None
+            st.rerun()
 
+# Élő árak frissítése a portfólió értékéhez
 live_prices: dict = {}
 for sym in COINS:
     cached = st.session_state["cache"].get(f"{sym}_{selected_tf}")
@@ -558,48 +577,27 @@ pnl_pct  = (port_val / STARTING_BALANCE - 1) * 100
 #  METRIC ROW
 # ─────────────────────────────────────────────────────────────────
 c1, c2, c3, c4, c5 = st.columns(5)
-
 signal_icons = {"BUY": "🟢", "SELL": "🔴", "HOLD": "🟡"}
 
 with c1:
-    st.metric(
-        label="💰 LIVE PRICE",
-        value=f"${price:,.4f}" if price else "—",
-        delta=None,
-    )
+    st.metric(label="💰 LIVE PRICE", value=f"${price:,.4f}" if price else "—", delta=None)
 with c2:
     sig_icon = signal_icons.get(signal, "⬜")
-    st.metric(
-        label="📡 SIGNAL",
-        value=f"{sig_icon} {signal}",
-    )
+    st.metric(label="📡 CURRENT STRATEGY", value=f"{sig_icon} {signal}")
 with c3:
     rsi_disp = f"{rsi_val:.1f}" if rsi_val else "—"
     st.metric(label="📊 RSI (14)", value=rsi_disp)
-
 with c4:
-    st.metric(
-        label="💼 PORTFOLIO VALUE",
-        value=f"${port_val:,.2f}",
-        delta=f"${port_val - STARTING_BALANCE:+,.2f}",
-        delta_color="normal",
-    )
+    st.metric(label="💼 PORTFOLIO VALUE", value=f"${port_val:,.2f}", delta=f"${port_val - STARTING_BALANCE:+,.2f}")
 with c5:
-    pnl_color = "normal" if pnl_pct >= 0 else "inverse"
-    st.metric(
-        label="📈 TOTAL PnL",
-        value=f"{pnl_pct:+.2f}%",
-        delta=f"from ${STARTING_BALANCE:,.0f} start",
-        delta_color="off",
-    )
+    st.metric(label="📈 TOTAL PnL", value=f"{pnl_pct:+.2f}%", delta=f"from ${STARTING_BALANCE:,.0f} start", delta_color="off")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────────
 #  CHART SECTION
 # ─────────────────────────────────────────────────────────────────
-st.markdown(f"<div class='section-title'>📈 {selected_symbol} — {TIMEFRAMES[selected_tf]} chart</div>",
-            unsafe_allow_html=True)
+st.markdown(f"<div class='section-title'>📈 {selected_symbol} — {TIMEFRAMES[selected_tf]} chart</div>", unsafe_allow_html=True)
 
 if not df_main.empty:
     fig = build_chart(df_main, selected_symbol)
@@ -610,8 +608,7 @@ else:
 # ─────────────────────────────────────────────────────────────────
 #  SIGNAL DETAIL
 # ─────────────────────────────────────────────────────────────────
-st.markdown("<div class='section-title'>🔬 Signal & Indicator Snapshot</div>",
-            unsafe_allow_html=True)
+st.markdown("<div class='section-title'>🔬 Signal & Indicator Snapshot</div>", unsafe_allow_html=True)
 
 col_a, col_b, col_c = st.columns(3)
 
@@ -642,8 +639,7 @@ with col_c:
         )
 
 st.markdown("<br>", unsafe_allow_html=True)
-st.markdown("<div class='section-title'>✅ Confluence Conditions</div>",
-            unsafe_allow_html=True)
+st.markdown("<div class='section-title'>✅ Confluence Conditions</div>", unsafe_allow_html=True)
 
 if price and rsi_val and bb_lo and bb_hi and macd_h is not None:
     prev_hist = df_main["macd_hist"].dropna().iloc[-2] if len(df_main.dropna(subset=["macd_hist"])) >= 2 else macd_h
@@ -664,21 +660,16 @@ if price and rsi_val and bb_lo and bb_hi and macd_h is not None:
         (f"{'✅' if s3 else '⬜'} MACD Hist ↓",        s3),
     ]
     for col, (label, _) in zip(cols, labels):
-        col.markdown(
-            f"<p style='font-size:.8rem;color:#c9d1d9;'>{label}</p>",
-            unsafe_allow_html=True,
-        )
-    st.caption("Left 3 = BUY conditions  |  Right 3 = SELL conditions  |  All three in a group must be ✅ for a signal")
+        col.markdown(f"<p style='font-size:.8rem;color:#c9d1d9;'>{label}</p>", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────────
 #  TRADE LOG
 # ─────────────────────────────────────────────────────────────────
-st.markdown("<div class='section-title'>📋 Paper Trade Log</div>",
-            unsafe_allow_html=True)
+st.markdown("<div class='section-title'>📋 Paper Trade Log (Approved Only)</div>", unsafe_allow_html=True)
 
 log = st.session_state["trade_log"]
 if not log:
-    st.caption("No trades executed yet — waiting for confluence signals.")
+    st.caption("No trades executed yet — waiting for verified user confirmation.")
 else:
     rows = list(reversed(log[-50:]))
     html = """<table class='trade-table'>
@@ -706,8 +697,7 @@ else:
 # ─────────────────────────────────────────────────────────────────
 #  1H OHLCV
 # ─────────────────────────────────────────────────────────────────
-st.markdown("<br><div class='section-title'>📊 1H Recent OHLCV — {}</div>".format(selected_symbol),
-            unsafe_allow_html=True)
+st.markdown("<br><div class='section-title'>📊 1H Recent OHLCV — {}</div>".format(selected_symbol), unsafe_allow_html=True)
 
 if not df_1h.empty:
     snap = df_1h[["open", "high", "low", "close", "volume"]].tail(8).copy()
@@ -715,11 +705,7 @@ if not df_1h.empty:
     snap.columns = ["Open", "High", "Low", "Close", "Volume"]
     st.dataframe(
         snap.style.format({
-            "Open":  "${:.4f}",
-            "High":  "${:.4f}",
-            "Low":   "${:.4f}",
-            "Close": "${:.4f}",
-            "Volume": "{:,.2f}",
+            "Open": "${:.4f}", "High": "${:.4f}", "Low": "${:.4f}", "Close": "${:.4f}", "Volume": "{:,.2f}"
         }),
         use_container_width=True,
         height=280,
@@ -732,7 +718,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 st.markdown(
     "<p style='color:#6b7280;font-size:.7rem;text-align:center;letter-spacing:.06em;'> "
     "⚡ ATOM Crypto Dashboard  •  For educational / paper trading purposes only  "
-    "•  Not financial advice  •  Data: Kraken public API  •  No API keys required"
+    "•  Not financial advice  •  Data: Kraken public API"
     "</p>",
     unsafe_allow_html=True,
 )
