@@ -148,7 +148,7 @@ init_state()
 def send_discord_alert(symbol: str, signal: str, price: float,
                        rsi: float, macd_hist: float,
                        bb_lower: float, bb_upper: float) -> bool:
-    """Fire a rich embed to Discord. Returns True on success."""
+    """Fire a rich embed to Discord with an @everyone ping. Returns True on success."""
     is_buy  = signal == "BUY"
     color   = 0x00FF88 if is_buy else 0xFF4D6D
     emoji   = "🟢" if is_buy else "🔴"
@@ -174,13 +174,18 @@ def send_discord_alert(symbol: str, signal: str, price: float,
         "timestamp": datetime.datetime.utcnow().isoformat(),
     }
 
-    payload = {"embeds": [embed]}
+    # Ide került be a tartalom, ami kiváltja a pinget a Discordon
+    payload = {
+        "content": f"@everyone 🚨 **ÚJ JELZÉS:** {symbol} → **{signal}**! 🚨",
+        "embeds": [embed]
+    }
+    
     try:
         r = requests.post(DISCORD_WEBHOOK, json=payload, timeout=8)
         return r.status_code in (200, 204)
     except Exception:
         return False
-
+    
 # ─────────────────────────────────────────────────────────────────
 #  DATA FETCHING (Binance REPLACED WITH Kraken)
 # ─────────────────────────────────────────────────────────────────
